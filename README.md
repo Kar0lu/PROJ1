@@ -1,6 +1,7 @@
 # PROJ1
 ## Authors
 - Jakub Szalacha
+- Kacper Capiga
 - Karol Godlewski
 - Karol Pacwa
 
