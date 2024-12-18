@@ -23,7 +23,7 @@ function drawChart(aapl) {
     const y = d3.scaleLinear()
         .domain([0, d3.max(aapl, d => d.close)])
         .nice()
-        .range([height - marginBottom, marginTop]);
+        .range([marginTop,height - marginBottom ]);
 
     // Declare the line generator.
     const line = d3.line()
@@ -59,7 +59,7 @@ function drawChart(aapl) {
             .attr("y", 10)
             .attr("fill", "currentColor")
             .attr("text-anchor", "start")
-            .text("↑ Daily close ($)"));
+            .text("Wartość w dB"));
 
     // Append a path for the background line.
     svg.append("path")
@@ -76,7 +76,8 @@ function drawChart(aapl) {
         .attr("d", line(aaplMissing));
 }
 
-// Button - Fetch JSON Data and Update Chart
+
+//Button - Fetch JSON Data and Update Chart
 document.getElementById("fetch-data").addEventListener("click", () => {
     fetch("http://localhost/data")
         .then(response => {
