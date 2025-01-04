@@ -7,9 +7,35 @@
     <script src="{{ url_for('static', filename='d3.v7.min.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='script.js') }}"></script>
 </head>
-<body>
+<body
+style="display: grid;
+grid-template-columns:1fr;">
     <div id="container"></div>
     <button id="fetch-data">Get Data</button>
-    <div id="data-display"></div>
+    <button id="export-data">Eksportuj jako CSV</button>
+    <button id="export-json">Eksportuj jako JSON</button>
+<div>
+    <input type="checkbox" name="Antena" id="A1">
+    <label for="A1">Antena1</label>
+    <input type="checkbox" name="Antena" id="A2">
+    <label for="A2">Antena2</label>
+    <input type="checkbox" name="Antena" id="A3">
+    <label for="A3">Antena3</label>
+</div>
+<div>
+    <label for="start">Początek:</label>
+    <input type="datetime-local" id="start" name="start" value="2024-09-30T23:00" max="">
+    <label for="end">Koniec:</label>
+    <input type="datetime-local" id="end" name="end" value="2024-10-01T01:00" max="">
+</div> 
+
+<div
+style="max-width: 400px;">
+    <label for="min">Minimalna wartość [dB]:</label>
+    <input type="number" id="min" name="min" value="-120">
+    <label for="end">Maksymalna wartość [dB]:</label>
+    <input type="number" id="max" name="max" value="-60">
+</div>
+  <div id="data-display"></div>
 </body>
 </html>
