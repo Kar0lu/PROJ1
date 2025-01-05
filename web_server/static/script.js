@@ -36,8 +36,35 @@ function setMaxDate() {
 }
 window.onload = setMaxDate;
 
+// Function to divide the data to segments in order to differentiate the missing and valid parts 
+function splitContinuousSegments(data, maxGapMillis) {
+    const segments = [];
+    let currentSegment = [data[0]];
+
+    for (let i = 1; i < data.length; i++) {
+        const gap = data[i].date - data[i - 1].date;
+        if (gap <= maxGapMillis) {
+            currentSegment.push(data[i]);
+        } else {
+            segments.push({ data: currentSegment, isContinuous: true });
+            currentSegment = [data[i]];
+            segments.push({ data: [data[i - 1], data[i]], isContinuous: false });
+        }
+    }
+
+    if (currentSegment.length > 0) {
+        segments.push({ data: currentSegment, isContinuous: true });
+    }
+
+    return segments;
+}
+
 // Function to draw the chart with JSON data
 function drawChart(aapl, startTime, endTime, minValue, maxValue) {
+
+    // Max gap is set to 5 mninutes
+    const maxGapMillis = 5 * 60 * 1000; 
+    const segments = splitContinuousSegments(aapl, maxGapMillis);
 
     // Map data if needed
     const aaplMissing = aapl.map(d => ({
@@ -75,30 +102,21 @@ function drawChart(aapl, startTime, endTime, minValue, maxValue) {
         .attr("viewBox", [0, 0, width, height])
         .attr("style", "max-width: 100%; height: auto; height: intrinsic;");
 
-   // Draw each antenna's data
-   dataByAntenna.forEach((data, antenna) => {
 
-    // Filter out invalid or missing data for each antenna
-    const validData = data.filter(d => !isNaN(d.close) && d.date >= startTime && d.date <= endTime);
-    const missingData = data.filter(d => isNaN(d.close) && d.date >= startTime && d.date <= endTime);
-
-    // Draw path for valid data
-    svg.append("path")
-        .datum(validData)
-        .attr("fill", "none")
-        .attr("stroke", colorScale(antenna))
-        .attr("stroke-width", 2)
-        .attr("d", line);
-
-    // Draw path for missing data (with dashed line)
-    svg.append("path")
-        .datum(missingData)
-        .attr("fill", "none")
-        .attr("stroke", "gray")
-        .attr("stroke-dasharray", "4,4")  
-        .attr("stroke-width", 2)
-        .attr("d", line);
+    // Draw paths for each antenna separately
+    dataByAntenna.forEach((antennaData, antenna) => {
+        const segments = splitContinuousSegments(antennaData, maxGapMillis);
+        segments.forEach(segment => {
+            svg.append("path")
+                .datum(segment.data)
+                .attr("fill", "none")
+                .attr("stroke", colorScale(antenna)) 
+                .attr("stroke-width", 2)
+                .attr("stroke-dasharray", segment.isContinuous ? "0" : "5,5")
+                .attr("d", line);
+        });
 });
+
 
 // Adding X and Y axes
 svg.append("g")
