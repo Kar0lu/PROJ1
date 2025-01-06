@@ -1,1 +1,3 @@
 /venv
+/web_server/data/**
+/web_server/scripts/ssh_certs/**

@@ -2,7 +2,8 @@ import json
 import requests
 import threading
 import time
-from flask import Flask, render_template, jsonify
+from scripts.jsonize import get_json
+from flask import Flask, render_template, jsonify, request
 
 app = Flask(__name__)
 
@@ -32,6 +33,11 @@ def periodic_sync(interval=1800):
             fetch_and_update_data(antenna, url)
         print("Update finished. Next one in 30 minutes.")
         time.sleep(interval)
+
+@app.route('/get_real_data', methods = ['GET'])
+def get_retrived_data_in_json_format():
+    req = request.get_json()[0]
+    return get_json(req['antenna'], req['start'], req['stop'])
 
 # Adding routes
 @app.route('/')
