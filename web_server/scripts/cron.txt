@@ -1,0 +1,1 @@
+30,0 * * * * /root/PROJ1/web_server/scripts/fetch_data.sh /root/PROJ1/web_server/scripts/ssh_certs/ /root/test_data/ /root/PROJ1/web_server/data/raw/
