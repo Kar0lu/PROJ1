@@ -1,3 +1,7 @@
 /venv
+/.venv
 /web_server/data/**
 /web_server/scripts/ssh_certs/**
+*.db
+__pycache__
+.DS_Store

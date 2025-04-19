@@ -2,10 +2,22 @@ import json
 import requests
 import threading
 import time
-from scripts.jsonize import get_json
-from flask import Flask, render_template, jsonify, request
+from scripts import backend_bp
+from models import db
+from flask import Flask, render_template, jsonify
 
 app = Flask(__name__)
+
+# Developer db setup
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///PROJ.db"
+db.init_app(app)
+
+# Schema creation
+with app.app_context():
+    db.create_all()
+
+# Registering blueprint
+app.register_blueprint(backend_bp)
 
 external_servers = {
     "data1": "http://external-server1.com/api/data1",
@@ -33,11 +45,6 @@ def periodic_sync(interval=1800):
             fetch_and_update_data(antenna, url)
         print("Update finished. Next one in 30 minutes.")
         time.sleep(interval)
-
-@app.route('/get_real_data', methods = ['GET'])
-def get_retrived_data_in_json_format():
-    req = request.get_json()[0]
-    return get_json(req['antenna'], req['start'], req['stop'])
 
 # Adding routes
 @app.route('/')
