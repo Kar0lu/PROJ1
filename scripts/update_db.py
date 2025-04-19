@@ -2,19 +2,12 @@
 import os
 from numpy import fromfile, float32
 import datetime
-import json
 import sys
 
 # To import from parent directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from server import app, db
 from models import Data, Antenna
-
-class DateTimeJSONEncoder(json.JSONEncoder):
-        def default(self, obj):
-            if isinstance(obj, datetime):
-                return obj.isoformat()
-            return super(DateTimeJSONEncoder, self).default(obj)
 
 # Setting raw data path and listing all files
 data_path = os.path.join(os.path.dirname(__file__), "..", "data", "raw")

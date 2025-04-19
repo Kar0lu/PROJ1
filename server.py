@@ -2,7 +2,7 @@ import json
 import requests
 import threading
 import time
-from scripts import backend_bp
+from backend import backend_bp
 from models import db
 from flask import Flask, render_template, jsonify
 

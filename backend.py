@@ -1,10 +1,8 @@
 from datetime import datetime
-from flask import Blueprint, request, jsonify
-import os, sys
-
-# To import from parent directory
-sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-from models import Data, Antenna, db
+from flask import ( Blueprint,
+                    request,
+                    jsonify )
+from models import Data, Antenna
 
 backend_bp = Blueprint('backend', __name__)
 
