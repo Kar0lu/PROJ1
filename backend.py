@@ -28,7 +28,7 @@ def get_retrived_data_in_json_format():
     
     # Filtering data and sorting it ascending
     filtered_data = antenna.data.filter( Data.timestamp >= start_time,
-                                         Data.timestamp <= stop_time).order_by(Data.timestamp.asc()).all()
+                                         Data.timestamp <= stop_time ).order_by(Data.timestamp.asc()).all()
     
     filtered_data = { d.timestamp.isoformat(): d.data for d in filtered_data }
     

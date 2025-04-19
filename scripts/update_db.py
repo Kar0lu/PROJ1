@@ -1,4 +1,4 @@
-#!../../.venv/bin/python3
+#!../.venv/bin/python3
 import os
 from numpy import fromfile, float32
 import datetime
@@ -24,18 +24,18 @@ for fetched_file in all_fetched_files:
     ymd = splitted[1].split('-')
     hms = splitted[2].split(':')
 
+    date = datetime.datetime(int(ymd[0]), int(ymd[1]), int(ymd[2]),
+                             int(hms[0]), int(hms[1]), int(hms[2]))
+
     # Looking for existing data and antenna
     with app.app_context():
-        existing_data = Data.query.filter_by(data_id=fetched_file).scalar()
+        existing_data = Data.query.filter(Data.timestamp==date, Data.antenna_id==name).scalar()
         existing_antenna = Antenna.query.filter_by(antenna_id=name).scalar()
 
     # If we already have data from this file, so we can move on
     if existing_data is not None:
         continue
         
-    date = datetime.datetime(int(ymd[0]), int(ymd[1]), int(ymd[2]),
-                             int(hms[0]), int(hms[1]), int(hms[2]))
-    
     # Reading file data
     raw_data = fromfile(open(file_path), dtype = float32)
 
@@ -49,8 +49,7 @@ for fetched_file in all_fetched_files:
             db.session.add(existing_antenna)
             db.session.commit()
 
-        new_data = Data(data_id=fetched_file,
-                        data=data,
+        new_data = Data(data=data,
                         timestamp=date,
                         antenna=existing_antenna)
         db.session.add(new_data)

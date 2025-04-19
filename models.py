@@ -9,6 +9,7 @@ from sqlalchemy.orm import ( DeclarativeBase,
                              relationship )
 from typing import List
 from datetime import datetime
+from sqlalchemy.ext.hybrid import hybrid_property
 
 class Base(DeclarativeBase):
     pass
@@ -27,8 +28,11 @@ class Data(db.Model):
     ''' Antenna's data '''
     __tablename__ = "data"
 
-    data_id: Mapped[str] = mapped_column(String(23), primary_key=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, primary_key=True)
+    antenna_id: Mapped[str] = mapped_column(ForeignKey("antennas.antenna_id"), primary_key=True)
     data: Mapped[list] = mapped_column(JSON)
-    timestamp: Mapped[datetime] = mapped_column(DateTime)
-    antenna_id: Mapped[str] = mapped_column(ForeignKey("antennas.antenna_id"))
     antenna: Mapped["Antenna"] = relationship(back_populates="data")
+
+    @hybrid_property
+    def source_filename(self):
+        return f"{self.antenna_id}_{self.timestamp.date().isoformat()}_{self.timestamp.time().isoformat(timespec='seconds')}"
