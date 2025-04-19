@@ -3,6 +3,7 @@ import os
 from numpy import fromfile, float32
 import datetime
 import sys
+from tqdm import tqdm
 
 # To import from parent directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
@@ -11,46 +12,68 @@ from models import Data, Antenna
 
 # Setting raw data path and listing all files
 data_path = os.path.join(os.path.dirname(__file__), "..", "data", "raw")
-all_fetched_files = os.popen(f'ls {data_path}').read().split("\n")
+all_fetched_files = [
+    f for f in os.listdir(data_path)
+    if f and not f.startswith('.')  # pomijamy puste i ukryte pliki
+]
 all_fetched_files.pop()
 
-# Checking for every file if it exists in database
-for fetched_file in all_fetched_files:
-    # For better readability later on
-    file_path = os.path.join(data_path, fetched_file)
-    # Separating Anttenna name from date and time
-    splitted = fetched_file.split('_')
-    name = splitted[0]
-    ymd = splitted[1].split('-')
-    hms = splitted[2].split(':')
+with app.app_context():
+    existing_antennas = {a.antenna_id for a in Antenna.query.all()}
+    existing_data_keys = {
+        (d.antenna_id, d.timestamp) for d in Data.query.with_entities(Data.antenna_id, Data.timestamp)
+    }
 
-    date = datetime.datetime(int(ymd[0]), int(ymd[1]), int(ymd[2]),
-                             int(hms[0]), int(hms[1]), int(hms[2]))
+    # Buffering, because otherwise it crashes
+    buffer = []
+    batch_size = 1000
 
-    # Looking for existing data and antenna
-    with app.app_context():
-        existing_data = Data.query.filter(Data.timestamp==date, Data.antenna_id==name).scalar()
-        existing_antenna = Antenna.query.filter_by(antenna_id=name).scalar()
+    for fetched_file in tqdm(all_fetched_files):
+        # For better readability later on
+        file_path = os.path.join(data_path, fetched_file)
+        # Separating Anttenna name from date and time
+        splitted = fetched_file.split('_')
 
-    # If we already have data from this file, so we can move on
-    if existing_data is not None:
-        continue
+        if len(splitted) < 3:
+            print(f"Ommiting bad filename: {fetched_file}")
+            continue
+        name = splitted[0]
+
+        try:
+            ymd = splitted[1].split('-')
+            hms = splitted[2].split(':')
+            date = datetime.datetime(int(ymd[0]), int(ymd[1]), int(ymd[2]),
+                                    int(hms[0]), int(hms[1]), int(hms[2]))
+        except (IndexError, ValueError) as e:
+            print(f"Date parsing error in file {fetched_file}: {e}")
+            continue
+
+        # Looking for existing data
+        if (name, date) in existing_data_keys:
+            continue
+            
+        # Reading file data
+        raw_data = fromfile(open(file_path), dtype = float32)
+
+        # Converting array of float32 to list of float
+        data = [ float(val) for val in raw_data ]
         
-    # Reading file data
-    raw_data = fromfile(open(file_path), dtype = float32)
 
-    # Converting array of float32 to list of float
-    data = [ float(val) for val in raw_data ]
-    
-    with app.app_context():
         # If antenna doesn't exist we create one
-        if existing_antenna is None:
-            existing_antenna = Antenna(antenna_id=name)
-            db.session.add(existing_antenna)
-            db.session.commit()
+        if name not in existing_antennas:
+            db.session.add(Antenna(antenna_id=name))
+            existing_antennas.add(name)
 
-        new_data = Data(data=data,
-                        timestamp=date,
-                        antenna=existing_antenna)
-        db.session.add(new_data)
+        # Add data to buffer
+        buffer.append(Data(data=data, timestamp=date, antenna_id=name))
+
+        # Commit in batches
+        if len(buffer) >= batch_size:
+            db.session.add_all(buffer)
+            db.session.commit()
+            buffer = []
+
+    # If something left in buffer commit it
+    if buffer:
+        db.session.add_all(buffer)
         db.session.commit()
