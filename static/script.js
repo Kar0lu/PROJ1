@@ -6,10 +6,7 @@ const marginRight = 30;
 const marginBottom = 30;
 const marginLeft = 40;
 
-// selectors of antennas
-const checkbox1 = document.getElementById('A1');
-const checkbox2 = document.getElementById('A2');
-const checkbox3 = document.getElementById('A3');
+
 
 // colorScale for each antenna
 const colorScale = d3.scaleOrdinal()
@@ -143,12 +140,13 @@ addLegend(svg, Array.from(dataByAntenna.keys()), colorScale);
 //Button - Fetch JSON Data and Update Chart
 document.getElementById("fetch-data").addEventListener("click", () => {
 
-    // Checking the indputs from html file
+    // Checking the inputs from html file
 
     const selectedAntennas = [];
-    if (checkbox1.checked) selectedAntennas.push("Antena1");
-    if (checkbox2.checked) selectedAntennas.push("Antena2");
-    if (checkbox3.checked) selectedAntennas.push("Antena3");
+    if (document.getElementById('gru').checked) selectedAntennas.push("gru");
+    // if (checkbox2.checked) selectedAntennas.push("Antena2");
+    // if (checkbox3.checked) selectedAntennas.push("Antena3");
+    console.log(selectedAntennas);
 
     const startTime = new Date(document.getElementById('start').value);
     const endTime = new Date(document.getElementById('end').value);
@@ -175,55 +173,55 @@ document.getElementById("fetch-data").addEventListener("click", () => {
 
     alert(`Wybrany przedział czasowy: ${startTime.toLocaleString()} - ${endTime.toLocaleString()}`);
 
+
+        // Function to convert date to string format, that does not change the time zone
+        function fromDateToString(date){
+            date = new Date(+date);
+            date.setTime(date.getTime() - (date.getTimezoneOffset() * 60000));
+            let dateAsString =  date.toISOString().substr(0, 19);
+            return dateAsString;
+        }
+
+
         const promises = selectedAntennas.map(antenna => {
-            const nr = antenna.slice(-1);
-            return fetch(`http://localhost:5000/data${nr}`)
+            const name = antenna;
+            return fetch(`http://127.0.0.1:5000/get_real_data?antenna=${name}&start_time=${fromDateToString(startTime)}&stop_time=${fromDateToString(endTime)}`)
                 .then(response => response.json())
                 .then(result => {
 
-                    // Checking the data format
-                    if (!Array.isArray(result) || result.length === 0) {
-                        console.error(`Brak danych dla ${antenna}. Odpowiedź serwera:`, result);
-                        alert(`Brak danych dla ${antenna}.`);
-                        return [];
-                    }
-    
-                    // Data processing
-                    const antennaData = result.map(d => {
-                        if (d.date && d.close) {
-                            return {
-                                date: new Date(d.date),
-                                close: parseFloat(d.close),
-                                antenna: antenna,
-                            };
-                        } else {
-                            console.warn(`Nieprawidłowe dane dla ${antenna}:`, d);
-                            return null;
+                    const intervalMs = 3125;
+                    let antennaData = [];
+                
+                    for (const [startDateStr, values] of Object.entries(result)) {
+                        const startDate = new Date(startDateStr);
+                
+                        if (!Array.isArray(values)) {
+                            console.warn(`Oczekiwano tablicy wartości dla ${antenna}, otrzymano:`, values);
+                            continue;
                         }
-                    }).filter(d => d !== null);
-    
+                
+                        const partialData = values.map((val, idx) => {
+                            if (val !== null && val !== undefined) {
+                                return {
+                                    date: new Date(startDate.getTime() + idx * intervalMs),
+                                    close: parseFloat(val),
+                                    antenna: antenna,
+                                };
+                            } else {
+                                console.warn(`Nieprawidłowa wartość dla ${antenna} w indeksie ${idx} (data początkowa ${startDateStr}):`, val);
+                                return null;
+                            }
+                        }).filter(d => d !== null);
+                
+                        antennaData = antennaData.concat(partialData);
+                    }
+                
                     if (antennaData.length === 0) {
                         console.warn(`Brak prawidłowych danych w tablicy dla ${antenna}.`);
                         alert(`Brak prawidłowych danych dla ${antenna}.`);
                         return [];
                     }
-    
-                    // Checking the date of last date
-                    const latestDataDate = antennaData[antennaData.length - 1].date;
-                    const currentDate = new Date();
-                    const timeDifference = (currentDate - latestDataDate) / (1000 * 60); 
-    
-                    if (timeDifference > 30) {
-                        const simpleDate = latestDataDate.toLocaleString('en-GB', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            hour12: false
-                        });
-                        alert(`Dane dla ${antenna} nie zostały zaktualizowane od ${simpleDate}.`);
-                    }
+                
                     return antennaData;
                 })
                 .catch(error => {
