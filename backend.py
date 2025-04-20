@@ -34,4 +34,8 @@ def get_retrived_data_in_json_format():
     
     return jsonify(filtered_data)
 
-    
+@backend_bp.route('/get_antennas', methods = ['GET'])
+def get_antennas():
+    antennas = Antenna.query.all()
+    antennas = { "content": [ a.antenna_id for a in antennas ] }
+    return jsonify(antennas)
