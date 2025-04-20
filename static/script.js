@@ -10,9 +10,8 @@ const selectedAntennas = [];
 
 // colorScale for each antenna
 const colorScale = d3.scaleOrdinal()
-    .domain(["Antena1", "Antena2", "Antena3"]) 
-    .range(["#1f77b4", "#ff7f0e", "#2ca02c"]);
-
+    .domain(["Antena1", "Antena2", "Antena3", "Antena4", "Antena5", "Antena6", "Antena7", "Antena8", "Antena9", "Antena10"]) 
+    .range(["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]);
 
 let filteredData = []; 
 
@@ -132,13 +131,13 @@ svg.append("g")
         .attr("y", 10)
         .attr("fill", "currentColor")
         .attr("text-anchor", "start")
-        .text("Wartość w dB"));
+        .text("Wartość w dBm"));
 addLegend(svg, Array.from(dataByAntenna.keys()), colorScale);
 
 }
 
 
-// Fetching antennas from the server and creating checkboxes
+
 fetch(`http://127.0.0.1:5000/get_antennas`)
 .then(response => response.json())
 .then(data => {
@@ -156,6 +155,14 @@ fetch(`http://127.0.0.1:5000/get_antennas`)
         const label = document.createElement('label');
         label.htmlFor = antenna;
         label.textContent = antenna;
+
+        checkbox.addEventListener('change', () => {
+            if (checkbox.checked) {
+                label.classList.add('active');
+            } else {
+                label.classList.remove('active');
+            }
+        });
 
         wrapper.appendChild(checkbox);
         wrapper.appendChild(label);
@@ -231,7 +238,8 @@ document.getElementById("fetch-data").addEventListener("click", () => {
                         }
                 
                         const partialData = values.map((val, idx) => {
-                            if (val !== null && val !== undefined) {
+                            console.log(val)
+                            if (val !== null && val !== undefined && !isNaN(val) && val <= 50 && val >= -150) {
                                 return {
                                     date: new Date(startDate.getTime() + idx * intervalMs),
                                     close: parseFloat(val),
@@ -267,12 +275,14 @@ document.getElementById("fetch-data").addEventListener("click", () => {
             const aapl = results.flat();
 
             // Filtering the data by date
-            filteredData = aapl.filter(d => d.date >= startTime && d.date <= endTime);
+            const filteredData = aapl.filter(d => d.date >= startTime && d.date <= endTime);
+            console.log(filteredData);
 
             if (filteredData.length === 0) {
                 alert('Brak danych do wyświetlenia dla wybranego przedziału czasowego.');
                 return;
             }
+            console.log(filteredData);
             drawChart(filteredData, startTime, endTime, minValue, maxValue);
         })
         .catch(error => {
@@ -288,7 +298,7 @@ document.getElementById("export-data").addEventListener("click", () => {
 
     //Converting to CSV
     function convertToCSV(data) {
-        const header = ["Data", "Wartosc (dB)", "Antena"];
+        const header = ["Data", "Wartosc (dBm)", "Antena"];
         const rows = data.map(d => {
             return [
                 d.date.toISOString(), 
@@ -351,4 +361,5 @@ function addLegend(svg, antennas, colorScale) {
             .style("font-size", "12px")
             .text(antenna);
     });
+    
 }
