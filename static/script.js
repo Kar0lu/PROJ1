@@ -5,7 +5,7 @@ const marginTop = 20;
 const marginRight = 30;
 const marginBottom = 30;
 const marginLeft = 40;
-
+const selectedAntennas = [];
 
 
 // colorScale for each antenna
@@ -137,15 +137,45 @@ addLegend(svg, Array.from(dataByAntenna.keys()), colorScale);
 
 }
 
+
+// Fetching antennas from the server and creating checkboxes
+fetch(`http://127.0.0.1:5000/get_antennas`)
+.then(response => response.json())
+.then(data => {
+    const selectContainer = document.getElementById('select-container');
+
+    data.content.forEach(antenna => {
+        const wrapper = document.createElement('div');
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.name = 'Antena'; //
+        checkbox.id = antenna;
+        checkbox.value = antenna;
+
+        const label = document.createElement('label');
+        label.htmlFor = antenna;
+        label.textContent = antenna;
+
+        wrapper.appendChild(checkbox);
+        wrapper.appendChild(label);
+        selectContainer.appendChild(wrapper);
+    });
+});
+
+
 //Button - Fetch JSON Data and Update Chart
 document.getElementById("fetch-data").addEventListener("click", () => {
 
-    // Checking the inputs from html file
-
+    const checkboxes = document.querySelectorAll('input[name="Antena"]');
     const selectedAntennas = [];
-    if (document.getElementById('gru').checked) selectedAntennas.push("gru");
-    // if (checkbox2.checked) selectedAntennas.push("Antena2");
-    // if (checkbox3.checked) selectedAntennas.push("Antena3");
+
+    checkboxes.forEach(checkbox => {
+        if (checkbox.checked) {
+            selectedAntennas.push(checkbox.value.toLowerCase());
+        }
+    });
+
     console.log(selectedAntennas);
 
     const startTime = new Date(document.getElementById('start').value);

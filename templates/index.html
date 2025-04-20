@@ -5,24 +5,20 @@
     <meta name="viewport" content="initial-scale=1.0">
     <title>PROJ1</title>
     <script src="{{ url_for('static', filename='d3.v7.min.js') }}"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script type="module" src="{{ url_for('static', filename='script.js') }}"></script>
 </head>
-<body
-style="display: grid;
-grid-template-columns:1fr;">
+<body>
     <div id="container"></div>
+
+<div id="buttons-container">
     <button id="fetch-data">Wczytaj dane</button>
     <button id="export-data">Eksportuj jako CSV</button>
     <button id="export-json">Eksportuj jako JSON</button>
-<div>
-    <input type="checkbox" name="Antena" id="gru">
-    <label for="gru">GRU</label>
-    <!-- <input type="checkbox" name="Antena" id="A2">
-    <label for="A2">Antena2</label>
-    <input type="checkbox" name="Antena" id="A3">
-    <label for="A3">Antena3</label> -->
 </div>
-<div>
+
+<div id="select-container"></div>
+<div id = "date-range">
     <label for="start">Początek:</label>
     <input type="datetime-local" id="start" name="start" value="2024-10-28T05:00" max="">
     <label for="end">Koniec:</label>
