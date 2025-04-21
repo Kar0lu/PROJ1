@@ -34,8 +34,10 @@ def get_retrived_data_in_json_format():
     one_after = antenna.data.filter( Data.timestamp > stop_time ).order_by( Data.timestamp.asc() ).first()
     
     filtered_data = { d.timestamp.isoformat(): d.data for d in filtered_data }
-    filtered_data[one_before.timestamp.isoformat()] = one_before.data
-    filtered_data[one_after.timestamp.isoformat()] = one_after.data
+    if one_before is not None:
+        filtered_data[one_before.timestamp.isoformat()] = one_before.data
+    if one_after is not None:
+        filtered_data[one_after.timestamp.isoformat()] = one_after.data
     
     return jsonify(filtered_data)
 
