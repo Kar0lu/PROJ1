@@ -20,17 +20,22 @@ def get_retrived_data_in_json_format():
         return res
     
     # Checking if antenna exists
-    try: antenna = Antenna.query.get(antenna_name)
-    except:
+    antenna = Antenna.query.get(antenna_name)
+    if antenna is None:
         res = jsonify({ "error": f"No antenna {antenna_name}" })
         res.status_code = 400
         return res
-    
+
     # Filtering data and sorting it ascending
     filtered_data = antenna.data.filter( Data.timestamp >= start_time,
                                          Data.timestamp <= stop_time ).order_by(Data.timestamp.asc()).all()
     
+    one_before = antenna.data.filter( Data.timestamp < start_time ).order_by( Data.timestamp.desc() ).first()
+    one_after = antenna.data.filter( Data.timestamp > stop_time ).order_by( Data.timestamp.asc() ).first()
+    
     filtered_data = { d.timestamp.isoformat(): d.data for d in filtered_data }
+    filtered_data[one_before.timestamp.isoformat()] = one_before.data
+    filtered_data[one_after.timestamp.isoformat()] = one_after.data
     
     return jsonify(filtered_data)
 
