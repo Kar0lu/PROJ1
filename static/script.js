@@ -1,11 +1,11 @@
-// Declare the chart dimensions and margins.
-const width = 928;
-const height = 500;
-const marginTop = 20;
-const marginRight = 30;
-const marginBottom = 30;
-const marginLeft = 40;
+
 const selectedAntennas = [];
+const marginBottom = 20; // Bottom margin
+const marginTop = 50; // Top margin
+const marginLeft = 30; // Left margin
+const marginRight = 20; // Right margin
+
+
 
 
 // colorScale for each antenna
@@ -58,6 +58,10 @@ function splitContinuousSegments(data, maxGapMillis) {
 // Function to draw the chart with JSON data
 function drawChart(aapl, startTime, endTime, minValue, maxValue) {
 
+    const width = container.offsetWidth;
+    const height = container.offsetHeight;
+
+
     // Max gap is set to 5 mninutes
     const maxGapMillis = 5 * 60 * 1000; 
     const segments = splitContinuousSegments(aapl, maxGapMillis);
@@ -96,7 +100,8 @@ function drawChart(aapl, startTime, endTime, minValue, maxValue) {
         .attr("width", width)
         .attr("height", height)
         .attr("viewBox", [0, 0, width, height])
-        .attr("style", "max-width: 100%; height: auto; height: intrinsic;");
+        .attr("preserveAspectRatio", "xMidYMid meet")
+        .attr("style", "max-width: 100%; ");
 
 
     // Draw paths for each antenna separately
@@ -148,7 +153,7 @@ fetch(`http://127.0.0.1:5000/get_antennas`)
 
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
-        checkbox.name = 'Antena'; //
+        checkbox.name = 'Antena'; 
         checkbox.id = antenna;
         checkbox.value = antenna;
 
@@ -183,15 +188,12 @@ document.getElementById("fetch-data").addEventListener("click", () => {
         }
     });
 
-    console.log(selectedAntennas);
 
     const startTime = new Date(document.getElementById('start').value);
     const endTime = new Date(document.getElementById('end').value);
 
     const minValue = Number(document.getElementById('min').value);
     const maxValue = Number(document.getElementById('max').value);
-
-
 
     // Checking whether the correct time period is chosen
 
@@ -207,9 +209,6 @@ document.getElementById("fetch-data").addEventListener("click", () => {
         alert('Wybierz co najmniej jedną antenę.');
         return;
     }
-
-    alert(`Wybrany przedział czasowy: ${startTime.toLocaleString()} - ${endTime.toLocaleString()}`);
-
 
         // Function to convert date to string format, that does not change the time zone
         function fromDateToString(date){
@@ -238,8 +237,7 @@ document.getElementById("fetch-data").addEventListener("click", () => {
                         }
                 
                         const partialData = values.map((val, idx) => {
-                            console.log(val)
-                            if (val !== null && val !== undefined && !isNaN(val) && val <= 50 && val >= -150) {
+                            if (val !== null && val !== undefined && !isNaN(val) && val <= 200 && val >= -200) {
                                 return {
                                     date: new Date(startDate.getTime() + idx * intervalMs),
                                     close: parseFloat(val),
@@ -276,14 +274,24 @@ document.getElementById("fetch-data").addEventListener("click", () => {
 
             // Filtering the data by date
             const filteredData = aapl.filter(d => d.date >= startTime && d.date <= endTime);
-            console.log(filteredData);
 
             if (filteredData.length === 0) {
                 alert('Brak danych do wyświetlenia dla wybranego przedziału czasowego.');
                 return;
             }
-            console.log(filteredData);
             drawChart(filteredData, startTime, endTime, minValue, maxValue);
+
+            const container = document.getElementById('container');
+            const resizeObserver = new ResizeObserver(() => {
+                if (filteredData.length > 0) {
+                    const startTime = new Date(document.getElementById('start').value);
+                    const endTime = new Date(document.getElementById('end').value);
+                    const minValue = Number(document.getElementById('min').value);
+                    const maxValue = Number(document.getElementById('max').value);
+                    drawChart(filteredData, startTime, endTime, minValue, maxValue);
+                }
+});
+resizeObserver.observe(container);
         })
         .catch(error => {
             console.error("Error fetching data:", error);
@@ -338,6 +346,9 @@ document.getElementById("export-json").addEventListener("click", () => {
 });
 
 function addLegend(svg, antennas, colorScale) {
+
+    const width = container.offsetWidth;
+
     const legend = svg.append("g")
         .attr("transform", `translate(${width - marginRight - 100}, ${marginTop})`)
         .attr("class", "legend");
