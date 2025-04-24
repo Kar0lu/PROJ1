@@ -1,7 +1,9 @@
 /venv
 /.venv
 /data/**
-/scripts/ssh_certs/**
+/scripts/ssh_keys/**
 *.db
 __pycache__
 .DS_Store
+
+!.gitkeep

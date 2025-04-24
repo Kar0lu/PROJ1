@@ -1,6 +1,6 @@
 #!../.venv/bin/python3
 import os
-from numpy import fromfile, float32
+import numpy as np
 import datetime
 import sys
 from tqdm import tqdm
@@ -24,7 +24,6 @@ with app.app_context():
         (d.antenna_id, d.timestamp) for d in Data.query.with_entities(Data.antenna_id, Data.timestamp)
     }
 
-    # Buffering, because otherwise it crashes
     buffer = []
     batch_size = 1000
 
@@ -52,8 +51,13 @@ with app.app_context():
         if (name, date) in existing_data_keys:
             continue
             
-        # Reading file data
-        raw_data = fromfile(open(file_path), dtype = float32)
+        # Reading file data if file is not corrupt
+        if os.path.getsize(file_path) != 768: continue
+        raw_data = np.fromfile(open(file_path), dtype = np.float32)
+
+        mean = float(np.nanmean(raw_data))
+        max = float(np.nanmax(raw_data))
+        min = float(np.nanmin(raw_data))
 
         # Converting array of float32 to list of float
         data = [ float(val) for val in raw_data ]
@@ -65,7 +69,12 @@ with app.app_context():
             existing_antennas.add(name)
 
         # Add data to buffer
-        buffer.append(Data(data=data, timestamp=date, antenna_id=name))
+        buffer.append(Data( data=data,
+                            timestamp=date,
+                            antenna_id=name,
+                            mean_value = mean,
+                            max_value=max,
+                            min_value=min ))
 
         # Commit in batches
         if len(buffer) >= batch_size:

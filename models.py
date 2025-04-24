@@ -2,7 +2,8 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import ( String,
                          JSON,
                          ForeignKey,
-                         DateTime )
+                         DateTime,
+                         Float )
 from sqlalchemy.orm import ( DeclarativeBase,
                              Mapped,
                              mapped_column,
@@ -32,6 +33,10 @@ class Data(db.Model):
     antenna_id: Mapped[str] = mapped_column(ForeignKey("antennas.antenna_id"), primary_key=True)
     data: Mapped[list] = mapped_column(JSON)
     antenna: Mapped["Antenna"] = relationship(back_populates="data")
+    
+    mean_value: Mapped[float] = mapped_column(Float(precision=24))
+    max_value: Mapped[float] = mapped_column(Float(precision=24))
+    min_value: Mapped[float] = mapped_column(Float(precision=24))
 
     @hybrid_property
     def source_filename(self):

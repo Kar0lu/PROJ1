@@ -3,8 +3,66 @@ from flask import ( Blueprint,
                     request,
                     jsonify )
 from models import Data, Antenna
+from sqlalchemy.orm import ( load_only,
+                             raiseload )
 
 backend_bp = Blueprint('backend', __name__)
+
+def get_detailed_data(antenna, start_time, stop_time):
+    # Filtering data and sorting it ascending
+    filtered_data = antenna.data.filter( Data.timestamp >= start_time,
+                                         Data.timestamp <= stop_time ).order_by(Data.timestamp.asc()).all()
+    
+    one_before = antenna.data.filter( Data.timestamp < start_time ).order_by( Data.timestamp.desc() ).first()
+    one_after = antenna.data.filter( Data.timestamp > stop_time ).order_by( Data.timestamp.asc() ).first()
+
+    if one_before is not None:
+        filtered_data.append(one_before)
+    if one_after is not None:
+        filtered_data.append(one_after)
+    
+    filtered_data = { d.timestamp.isoformat(): { "value": d.data, "max": d.max_value, "min": d.min_value, "avg": d.mean_value} for d in filtered_data }
+    
+    
+    return jsonify(filtered_data)
+
+def get_normal_data(antenna, start_time, stop_time):
+    load_options = [ load_only(Data.timestamp, Data.mean_value, Data.max_value, Data.min_value),
+                     raiseload("*") ]
+    # Filtering data and sorting it ascending
+    filtered_data = (
+    antenna.data
+    .options(*load_options)
+    .filter(Data.timestamp >= start_time, Data.timestamp <= stop_time)
+    .order_by(Data.timestamp.asc())
+    .all()
+    )
+
+    one_before = (
+        antenna.data
+        .options(*load_options)
+        .filter(Data.timestamp < start_time)
+        .order_by(Data.timestamp.desc())
+        .first()
+    )
+
+    one_after = (
+        antenna.data
+        .options(*load_options)
+        .filter(Data.timestamp > stop_time)
+        .order_by(Data.timestamp.asc())
+        .first()
+    )
+
+    if one_before is not None:
+        filtered_data.append(one_before)
+    if one_after is not None:
+        filtered_data.append(one_after)
+    
+    filtered_data = { d.timestamp.isoformat(): { "avg": d.mean_value, "max": d.max_value, "min": d.min_value } for d in filtered_data }
+
+    
+    return jsonify(filtered_data)
 
     
 @backend_bp.route('/get_real_data', methods = ['GET'])
@@ -19,6 +77,12 @@ def get_retrived_data_in_json_format():
         res.status_code = 400
         return res
     
+    # Check if request is for detailed or normal data
+    try:
+        detailed = bool(request.args.get('detailed'))
+    except:
+        detailed = False
+    
     # Checking if antenna exists
     antenna = Antenna.query.get(antenna_name)
     if antenna is None:
@@ -26,20 +90,10 @@ def get_retrived_data_in_json_format():
         res.status_code = 400
         return res
 
-    # Filtering data and sorting it ascending
-    filtered_data = antenna.data.filter( Data.timestamp >= start_time,
-                                         Data.timestamp <= stop_time ).order_by(Data.timestamp.asc()).all()
-    
-    one_before = antenna.data.filter( Data.timestamp < start_time ).order_by( Data.timestamp.desc() ).first()
-    one_after = antenna.data.filter( Data.timestamp > stop_time ).order_by( Data.timestamp.asc() ).first()
-    
-    filtered_data = { d.timestamp.isoformat(): d.data for d in filtered_data }
-    if one_before is not None:
-        filtered_data[one_before.timestamp.isoformat()] = one_before.data
-    if one_after is not None:
-        filtered_data[one_after.timestamp.isoformat()] = one_after.data
-    
-    return jsonify(filtered_data)
+    if detailed:
+        return get_detailed_data(antenna, start_time, stop_time)
+    else:
+        return get_normal_data(antenna, start_time, stop_time)
 
 @backend_bp.route('/get_antennas', methods = ['GET'])
 def get_antennas():
