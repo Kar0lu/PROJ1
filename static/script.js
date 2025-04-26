@@ -81,12 +81,16 @@ function drawChart(aapl, startTime, endTime, minValue, maxValue, detailed, selec
 
             const textLines = [
                 `Data: ${formatDate(d.date)}`,
-                formatValue("Śr", d.close),
             ];
             if (detailed === 0) {
+                textLines.push(formatValue("Śr", d.close));
                 textLines.push(formatValue("Maks", d.max ?? d.close));
                 textLines.push(formatValue("Min", d.min ?? d.close));
             }
+            else {
+                textLines.push(formatValue("Wartość", d.close));
+            }
+
 
             const text = tooltip.selectAll("text").data([{}]).join("text").call(text =>
                 text.selectAll("tspan")
@@ -97,16 +101,68 @@ function drawChart(aapl, startTime, endTime, minValue, maxValue, detailed, selec
                     .attr("font-weight", (_, i) => i ? null : "bold")
                     .text(d => d)
             );
-            size(text, path);
+            size(text, path, event, d);
         }).on("pointerleave", () => tooltip.style("display", "none"))
           .on("touchstart", event => event.preventDefault());
     }
 
-    function size(text, path) {
-        const { x, y, width: w, height: h } = text.node().getBBox();
-        text.attr("transform", `translate(${-w / 2},${15 - y})`);
-        path.attr("d", `M${-w / 2 - 10},5H-5l5,-5l5,5H${w / 2 + 10}v${h + 20}h-${w + 20}z`);
+    function size(text, path, event, d) {
+        const bbox = text.node().getBBox();
+        const w = bbox.width;
+        const h = bbox.height;
+        const mouseY = d3.pointer(event)[1];
+    
+        let tooltipOffsetY;
+        let arrowDirection;
+        let arrowOffset;
+        const yValue = y.invert(mouseY);
+        
+        if (yValue < d.close) {
+            tooltipOffsetY = -(h + 20); 
+            arrowDirection = -1; 
+            arrowOffset = -5;
+            console.log(h, d.close, mouseY );
+        } else {
+            tooltipOffsetY = 20; 
+            arrowDirection = 1; 
+            arrowOffset = 5;
+        }
+    
+        text.attr("transform", `translate(${-w / 2},${tooltipOffsetY + 10})`); 
+        let arrowPath;
+        
+        if(arrowDirection === 1) {
+            arrowPath = `
+            M${-w / 2 - 10},${arrowOffset}
+            H-5
+            l5,${arrowDirection * -5}
+            l5,${arrowDirection * 5}
+            H${w / 2 + 10}
+            v${h + 20}
+            h-${w + 20}
+            z
+        `
+        } else {    
+            arrowPath = `
+            M${-w / 2 - 10},${arrowOffset}
+            H-5
+            l5,${arrowDirection *-5}
+            l5,${arrowDirection * 5}
+            H${w / 2 + 10}
+            v-${h + 30}
+            h-${w + 20}
+            z
+        `
+        };
+    
+        path.attr("d", arrowPath);
     }
+    
+    
+    
+    
+    
+    
 
     svg.append("g")
         .attr("transform", `translate(0,${height - margin.bottom})`)
