@@ -291,7 +291,6 @@ document.getElementById("fetch-data").addEventListener("click", () => {
 
             if (selectedAntennas.length === 1) {
                 if (detailed === 0) {
-                    // Dane już zawierają avg, min, max — wystarczy je wyciągnąć
                     const avg = d3.mean(filteredData, d => d.close);
                     const max = d3.max(filteredData, d => d.max);
                     const min = d3.min(filteredData, d => d.min);
@@ -299,8 +298,8 @@ document.getElementById("fetch-data").addEventListener("click", () => {
                     document.getElementById('avg').textContent = `Średnia: ${avg.toFixed(2)} dBm`;
                     document.getElementById('max-label').textContent = `Maks: ${max.toFixed(2)} dBm`;
                     document.getElementById('min-label').textContent = `Min: ${min.toFixed(2)} dBm`;
+                    document.getElementById('alert').textContent = `Używasz trybu uśredniającego`;
                 } else {
-                    // detailed === 1: dane to surowe próbki, liczymy statystyki z wartości close
                     const avg = d3.mean(filteredData, d => d.close);
                     const max = d3.max(filteredData, d => d.close);
                     const min = d3.min(filteredData, d => d.close);
