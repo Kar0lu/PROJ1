@@ -1,144 +1,132 @@
+const margin = { top: 50, right: 20, bottom: 20, left: 30 };
 
-const selectedAntennas = [];
-const marginBottom = 20; // Bottom margin
-const marginTop = 50; // Top margin
-const marginLeft = 30; // Left margin
-const marginRight = 20; // Right margin
-
-
-
-
-// colorScale for each antenna
 const colorScale = d3.scaleOrdinal()
-    .domain(["Antena1", "Antena2", "Antena3", "Antena4", "Antena5", "Antena6", "Antena7", "Antena8", "Antena9", "Antena10"]) 
+    .domain(["Antena1", "Antena2", "Antena3", "Antena4", "Antena5", "Antena6", "Antena7", "Antena8", "Antena9", "Antena10"])
     .range(["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]);
 
-let filteredData = []; 
+let filteredData = [];
 
-// Function to iterate the antennas selected by the user
-function iterateSelectedAntennas(selectedAntennas, callback) {
-    if (selectedAntennas && Array.isArray(selectedAntennas)) {
-      for (const antenna of selectedAntennas) {
-        callback(antenna);
-      }
-    }
-  }
-// Function to set the maximum date to current time
-function setMaxDate() {
-    const now = new Date();
-    const formattedDate = now.toISOString().slice(0, 16);
-    document.getElementById('start').max = formattedDate;
-    document.getElementById('end').max = formattedDate;
-}
-window.onload = setMaxDate;
-
-// Function to divide the data to segments in order to differentiate the missing and valid parts 
 function splitContinuousSegments(data, maxGapMillis) {
     const segments = [];
     let currentSegment = [data[0]];
-
     for (let i = 1; i < data.length; i++) {
         const gap = data[i].date - data[i - 1].date;
         if (gap <= maxGapMillis) {
             currentSegment.push(data[i]);
         } else {
             segments.push({ data: currentSegment, isContinuous: true });
-            currentSegment = [data[i]];
             segments.push({ data: [data[i - 1], data[i]], isContinuous: false });
+            currentSegment = [data[i]];
         }
     }
-
-    if (currentSegment.length > 0) {
-        segments.push({ data: currentSegment, isContinuous: true });
-    }
-
+    if (currentSegment.length > 0) segments.push({ data: currentSegment, isContinuous: true });
     return segments;
 }
 
-// Function to draw the chart with JSON data
-function drawChart(aapl, startTime, endTime, minValue, maxValue) {
+function formatValue(label, value) {
+    return `${label}: ${value.toFixed(2)} dBm`;
+}
 
+function formatDate(date) {
+    return date.toLocaleString('pl-PL', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+function drawChart(aapl, startTime, endTime, minValue, maxValue, detailed, selectedAntennas) {
     const width = container.offsetWidth;
     const height = container.offsetHeight;
 
+    const maxGapMillis = 15 * 60 * 1000;
+    const x = d3.scaleTime().domain([startTime, endTime]).range([0, width]);
 
-    // Max gap is set to 5 mninutes
-    const maxGapMillis = 5 * 60 * 1000; 
-    const segments = splitContinuousSegments(aapl, maxGapMillis);
+    if (document.getElementById("auto").checked) {
+        minValue = d3.min(aapl, d => d.close) - 1;
+        maxValue = d3.max(aapl, d => d.close) + 1;
+    }
 
-    // Map data if needed
-    const aaplMissing = aapl.map(d => ({
-        ...d,
-        close: d.date.getUTCMonth() < 3 ? NaN : d.close
-    }));
-
-    // Declare the x (horizontal position) scale.
-    const x = d3.scaleTime() 
-    .domain([startTime, endTime])
-    .range([0, width]);
-
-    // Declare the y (vertical position) scale.
-    const y = d3.scaleLinear()
-        .domain([maxValue,minValue])
-        .nice()
-        .range([marginTop,height - marginBottom ]);
-
-    // Declare the line generator.
-    const line= d3.line()
-    .x(d => x((d.date)))  
-    .y(d => y(d.close));
-
-    // Group data by antenna (assuming aapl has an 'antenna' property)
+    const y = d3.scaleLinear().domain([maxValue, minValue]).nice().range([margin.top, height - margin.bottom]);
+    const line = d3.line().x(d => x(d.date)).y(d => y(d.close));
     const dataByAntenna = d3.group(aapl, d => d.antenna);
 
-
-    // Clear existing SVG if any
     d3.select("#container").select("svg").remove();
-
-    // Create the SVG container.
     const svg = d3.select("#container").append("svg")
         .attr("width", width)
         .attr("height", height)
         .attr("viewBox", [0, 0, width, height])
         .attr("preserveAspectRatio", "xMidYMid meet")
-        .attr("style", "max-width: 100%; ");
+        .attr("style", "max-width: 100%;");
 
-
-    // Draw paths for each antenna separately
     dataByAntenna.forEach((antennaData, antenna) => {
         const segments = splitContinuousSegments(antennaData, maxGapMillis);
         segments.forEach(segment => {
             svg.append("path")
                 .datum(segment.data)
                 .attr("fill", "none")
-                .attr("stroke", colorScale(antenna)) 
+                .attr("stroke", colorScale(antenna))
                 .attr("stroke-width", 2)
                 .attr("stroke-dasharray", segment.isContinuous ? "0" : "5,5")
                 .attr("d", line);
         });
-});
+    });
 
+    if (selectedAntennas.length === 1) {
+        const bisect = d3.bisector(d => d.date).center;
+        const tooltip = svg.append("g");
+        svg.on("pointerenter pointermove", event => {
+            const i = bisect(aapl, x.invert(d3.pointer(event)[0]));
+            const d = aapl[i];
+            tooltip.style("display", null).attr("transform", `translate(${x(d.date)},${y(d.close)})`);
+            tooltip.select("circle").attr("cx", 0).attr("cy", 0);
+            const path = tooltip.selectAll("path").data([{}]).join("path")
+                .attr("fill", "white").attr("opacity", 1).attr("stroke", "black");
 
-// Adding X and Y axes
-svg.append("g")
-    .attr("transform", `translate(0,${height - marginBottom})`)
-    .call(d3.axisBottom(x).ticks(width / 80).tickSizeOuter(0));
+            const textLines = [
+                `Data: ${formatDate(d.date)}`,
+                formatValue("Śr", d.close),
+            ];
+            if (detailed === 0) {
+                textLines.push(formatValue("Maks", d.max ?? d.close));
+                textLines.push(formatValue("Min", d.min ?? d.close));
+            }
 
-svg.append("g")
-    .attr("transform", `translate(${marginLeft},0)`)
-    .call(d3.axisLeft(y).ticks(height / 40))
-    .call(g => g.select(".domain").remove())
-    .call(g => g.selectAll(".tick line").clone()
-        .attr("x2", width - marginLeft - marginRight)
-        .attr("stroke-opacity", 0.1))
-    .call(g => g.append("text")
-        .attr("x", -marginLeft)
-        .attr("y", 10)
-        .attr("fill", "currentColor")
-        .attr("text-anchor", "start")
-        .text("Wartość w dBm"));
-addLegend(svg, Array.from(dataByAntenna.keys()), colorScale);
+            const text = tooltip.selectAll("text").data([{}]).join("text").call(text =>
+                text.selectAll("tspan")
+                    .data(textLines)
+                    .join("tspan")
+                    .attr("x", 0)
+                    .attr("y", (_, i) => `${i * 1.1}em`)
+                    .attr("font-weight", (_, i) => i ? null : "bold")
+                    .text(d => d)
+            );
+            size(text, path);
+        }).on("pointerleave", () => tooltip.style("display", "none"))
+          .on("touchstart", event => event.preventDefault());
+    }
 
+    function size(text, path) {
+        const { x, y, width: w, height: h } = text.node().getBBox();
+        text.attr("transform", `translate(${-w / 2},${15 - y})`);
+        path.attr("d", `M${-w / 2 - 10},5H-5l5,-5l5,5H${w / 2 + 10}v${h + 20}h-${w + 20}z`);
+    }
+
+    svg.append("g")
+        .attr("transform", `translate(0,${height - margin.bottom})`)
+        .call(d3.axisBottom(x).ticks(width / 80).tickSizeOuter(0));
+
+    svg.append("g")
+        .attr("transform", `translate(${margin.left},0)`)
+        .call(d3.axisLeft(y).ticks(height / 40))
+        .call(g => g.select(".domain").remove())
+        .call(g => g.selectAll(".tick line").clone()
+            .attr("x2", width - margin.left - margin.right)
+            .attr("stroke-opacity", 0.1))
+        .call(g => g.append("text")
+            .attr("x", -margin.left)
+            .attr("y", 10)
+            .attr("fill", "currentColor")
+            .attr("text-anchor", "start")
+            .text("Wartość w dBm"));
+
+    addLegend(svg, Array.from(dataByAntenna.keys()), colorScale);
 }
 
 
@@ -192,10 +180,12 @@ document.getElementById("fetch-data").addEventListener("click", () => {
     const startTime = new Date(document.getElementById('start').value);
     const endTime = new Date(document.getElementById('end').value);
 
+    var Time = new Date(endTime.getTime() - startTime.getTime());
+    var detailed = Time / 1000 / 60 / 60 / 24 >= 1.5 ? 0 : 1;
+
     const minValue = Number(document.getElementById('min').value);
     const maxValue = Number(document.getElementById('max').value);
 
-    // Checking whether the correct time period is chosen
 
     if (isNaN(startTime) || isNaN(endTime)) {
         alert('Podaj prawidłowy przedział czasowy.');
@@ -221,36 +211,53 @@ document.getElementById("fetch-data").addEventListener("click", () => {
 
         const promises = selectedAntennas.map(antenna => {
             const name = antenna;
-            return fetch(`http://127.0.0.1:5000/get_real_data?antenna=${name}&start_time=${fromDateToString(startTime)}&stop_time=${fromDateToString(endTime)}`)
+            return fetch(`http://127.0.0.1:5000/get_real_data?antenna=${name}&start_time=${fromDateToString(startTime)}&stop_time=${fromDateToString(endTime)}&detailed=${detailed}`)
                 .then(response => response.json())
                 .then(result => {
 
                     const intervalMs = 3125;
                     let antennaData = [];
-                
+
                     for (const [startDateStr, values] of Object.entries(result)) {
                         const startDate = new Date(startDateStr);
-                
-                        if (!Array.isArray(values)) {
-                            console.warn(`Oczekiwano tablicy wartości dla ${antenna}, otrzymano:`, values);
-                            continue;
-                        }
-                
-                        const partialData = values.map((val, idx) => {
-                            if (val !== null && val !== undefined && !isNaN(val) && val <= 200 && val >= -200) {
-                                return {
-                                    date: new Date(startDate.getTime() + idx * intervalMs),
-                                    close: parseFloat(val),
-                                    antenna: antenna,
-                                };
-                            } else {
-                                console.warn(`Nieprawidłowa wartość dla ${antenna} w indeksie ${idx} (data początkowa ${startDateStr}):`, val);
-                                return null;
+
+                        if (detailed === 0) {
+                            const { avg, max, min } = values;
+                            antennaData.push({
+                                date: startDate,
+                                close: avg,
+                                max: max,
+                                min: min,
+                                antenna: antenna
+                            });
+                            if(selectedAntennas.length === 1) {
                             }
-                        }).filter(d => d !== null);
-                
-                        antennaData = antennaData.concat(partialData);
+
+                        } else {
+                            const { avg, max, min, value } = values;
+
+                            if (!Array.isArray(value)) {
+                                console.warn(`Oczekiwano tablicy wartości dla ${antenna}, otrzymano:`, value);
+                                continue;
+                            }
+
+                            const partialData = value.map((val, idx) => {
+                                if (val !== null && val !== undefined && !isNaN(val) && val <= 200 && val >= -200) {
+                                    return {
+                                        date: new Date(startDate.getTime() + idx * intervalMs),
+                                        close: parseFloat(val),
+                                        antenna: antenna
+                                    };
+                                } else {
+                                    return null;
+                                }
+                            }).filter(d => d !== null);
+
+                            antennaData = antennaData.concat(partialData);
+
+                        }
                     }
+
                 
                     if (antennaData.length === 0) {
                         console.warn(`Brak prawidłowych danych w tablicy dla ${antenna}.`);
@@ -258,7 +265,7 @@ document.getElementById("fetch-data").addEventListener("click", () => {
                         return [];
                     }
                 
-                    return antennaData;
+                    return antennaData
                 })
                 .catch(error => {
                     console.error(`Error fetching data for ${antenna}:`, error);
@@ -271,15 +278,43 @@ document.getElementById("fetch-data").addEventListener("click", () => {
         Promise.all(promises)
         .then(results => {
             const aapl = results.flat();
+            console.log(aapl);
 
             // Filtering the data by date
-            const filteredData = aapl.filter(d => d.date >= startTime && d.date <= endTime);
+            filteredData = aapl.filter(d => d.date >= startTime && d.date <= endTime);
 
             if (filteredData.length === 0) {
                 alert('Brak danych do wyświetlenia dla wybranego przedziału czasowego.');
                 return;
             }
-            drawChart(filteredData, startTime, endTime, minValue, maxValue);
+            drawChart(filteredData, startTime, endTime, minValue, maxValue, detailed, selectedAntennas);
+
+            if (selectedAntennas.length === 1) {
+                if (detailed === 0) {
+                    // Dane już zawierają avg, min, max — wystarczy je wyciągnąć
+                    const avg = d3.mean(filteredData, d => d.close);
+                    const max = d3.max(filteredData, d => d.max);
+                    const min = d3.min(filteredData, d => d.min);
+            
+                    document.getElementById('avg').textContent = `Średnia: ${avg.toFixed(2)} dBm`;
+                    document.getElementById('max-label').textContent = `Maks: ${max.toFixed(2)} dBm`;
+                    document.getElementById('min-label').textContent = `Min: ${min.toFixed(2)} dBm`;
+                } else {
+                    // detailed === 1: dane to surowe próbki, liczymy statystyki z wartości close
+                    const avg = d3.mean(filteredData, d => d.close);
+                    const max = d3.max(filteredData, d => d.close);
+                    const min = d3.min(filteredData, d => d.close);
+            
+                    document.getElementById('avg').textContent = `Średnia: ${avg.toFixed(2)} dBm`;
+                    document.getElementById('max-label').textContent = `Maks: ${max.toFixed(2)} dBm`;
+                    document.getElementById('min-label').textContent = `Min: ${min.toFixed(2)} dBm`;
+                }
+            }
+            else{
+                document.getElementById('avg').textContent = `Średnia: -`;
+                document.getElementById('max-label').textContent = `Maks: -`;
+                document.getElementById('min-label').textContent = `Min: -`;
+            }
 
             const container = document.getElementById('container');
             const resizeObserver = new ResizeObserver(() => {
@@ -288,7 +323,7 @@ document.getElementById("fetch-data").addEventListener("click", () => {
                     const endTime = new Date(document.getElementById('end').value);
                     const minValue = Number(document.getElementById('min').value);
                     const maxValue = Number(document.getElementById('max').value);
-                    drawChart(filteredData, startTime, endTime, minValue, maxValue);
+                    drawChart(filteredData, startTime, endTime, minValue, maxValue, detailed, selectedAntennas);
                 }
 });
 resizeObserver.observe(container);
@@ -350,7 +385,7 @@ function addLegend(svg, antennas, colorScale) {
     const width = container.offsetWidth;
 
     const legend = svg.append("g")
-        .attr("transform", `translate(${width - marginRight - 100}, ${marginTop})`)
+        .attr("transform", `translate(${width - margin.right - 100}, ${margin.top})`)
         .attr("class", "legend");
 
     antennas.forEach((antenna, i) => {
