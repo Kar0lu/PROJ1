@@ -1,0 +1,1 @@
+0 * * * * /path/to/source/scripts/docker_fetch_data.sh

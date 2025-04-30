@@ -1,0 +1,43 @@
+services:
+  db:
+    image: postgres:17
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD", "pg_isready", "-q", "-d", "$POSTGRES_DB", "-U", "$POSTGRES_USER"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  proj2-app:
+    build: ./app
+    container_name: proj2-app
+    entrypoint: [ "bash", "-c", "gunicorn server:app --workers 4 --bind 0.0.0.0:8080 --access-logfile '-' --error-logfile '-'" ]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/health"]
+      interval: 5m
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+  
+  nginx:
+    build: ./nginx
+    ports:
+      - "80:80"
+    depends_on:
+      proj2-app:
+        condition: service_healthy
+      
+volumes:
+    postgres_data:
