@@ -1,1 +1,1 @@
-0 * * * * /path/to/source/scripts/docker_fetch_data.sh
+0 * * * * docker exec -d proj2-app /app/scripts/fetch_data.sh /Users/kacper/Desktop/Studia/Sem4/PROJ/raw/

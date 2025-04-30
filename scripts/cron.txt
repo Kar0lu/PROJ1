@@ -1,1 +1,0 @@
-30,0 * * * * /root/PROJ1/web_server/scripts/fetch_data.sh /Users/kacper/Desktop/Studia/Sem4/PROJ/raw/

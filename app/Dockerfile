@@ -30,7 +30,7 @@ COPY --from=builder /usr/local/bin/ /usr/local/bin/
 
 WORKDIR /app
  
-# Copy the Django project to the container
+# Copy app
 COPY --chown=appuser:appuser . .
 
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -40,8 +40,8 @@ USER appuser
 
 WORKDIR /app
  
-# Expose the Django port
+# Expose port for server
 EXPOSE 8080
  
-# Run Django’s development server
-CMD ["waitress-serve", "--call", "server:create_app"]
+# Run the server
+CMD ["gunicorn", "server:app", "--workers", "4", "--bind", "0.0.0.0:8080", "--access-logfile", "'-'", "--error-logfile", "'-'"]

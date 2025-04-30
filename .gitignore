@@ -1,7 +1,7 @@
 /venv
 /.venv
-/data/**
-/scripts/ssh_keys/**
+/app/data/raw/**
+/app/scripts/ssh_keys/**
 *.db
 __pycache__
 .DS_Store
