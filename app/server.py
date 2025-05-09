@@ -14,6 +14,3 @@ db.init_app(app)
 app.register_blueprint(backend_bp)
 app.register_blueprint(frontend_bp)
 
-# Schema creation
-with app.app_context():
-    db.create_all()
