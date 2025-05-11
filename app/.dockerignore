@@ -12,5 +12,5 @@ Dockerfile
 **/.gitkeep
 nginx/
 instance/
-.DS_Store
+**/.DS_Store
 *.env
