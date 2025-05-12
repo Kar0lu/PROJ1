@@ -6,6 +6,54 @@ const colorScale = d3.scaleOrdinal()
 
 let filteredData = [];
 
+document.addEventListener('DOMContentLoaded', function() {
+    const autoCheckbox = document.getElementById("auto");
+    const minInput = document.getElementById("min");
+    const maxInput = document.getElementById("max");
+
+    function handleAutoChange() {
+        if (autoCheckbox.checked) {
+            minInput.disabled = true;
+            minInput.style.borderColor = "lightgray";
+            maxInput.disabled = true;
+            maxInput.style.borderColor = "lightgray";
+        } else {
+            minInput.disabled = false;
+            minInput.style.borderColor = "";
+            maxInput.disabled = false;
+            maxInput.style.borderColor = "";
+        }
+    }
+    
+    autoCheckbox.checked = true;
+    handleAutoChange();
+    
+    autoCheckbox.addEventListener("change", handleAutoChange);
+});
+
+
+document.addEventListener('DOMContentLoaded', function() {
+    const now = new Date();
+    var userTimezoneOffset = now.getTimezoneOffset() * 60000;
+    now.setTime(now.getTime() - userTimezoneOffset);
+    const endDate = new Date(now);
+    
+    const sevenDaysAgo = new Date(now);
+    sevenDaysAgo.setDate(now.getDate() - 7);
+
+   
+    
+    function formatDateForInput(date) {
+        return date.toISOString().slice(0, 16);
+    }
+    
+    document.getElementById('start').value = formatDateForInput(sevenDaysAgo);
+    document.getElementById('end').value = formatDateForInput(endDate);
+    
+    document.getElementById('start').max = formatDateForInput(now);
+    document.getElementById('end').max = formatDateForInput(now);
+});
+
 function splitContinuousSegments(data, maxGapMillis) {
     const segments = [];
     let currentSegment = [data[0]];
@@ -121,7 +169,6 @@ function drawChart(aapl, startTime, endTime, minValue, maxValue, detailed, selec
             tooltipOffsetY = -(h + 20); 
             arrowDirection = -1; 
             arrowOffset = -5;
-            console.log(h, d.close, mouseY );
         } else {
             tooltipOffsetY = 20; 
             arrowDirection = 1; 
@@ -158,12 +205,6 @@ function drawChart(aapl, startTime, endTime, minValue, maxValue, detailed, selec
         path.attr("d", arrowPath);
     }
     
-    
-    
-    
-    
-    
-
     svg.append("g")
         .attr("transform", `translate(0,${height - margin.bottom})`)
         .call(d3.axisBottom(x).ticks(width / 80).tickSizeOuter(0));
@@ -187,7 +228,7 @@ function drawChart(aapl, startTime, endTime, minValue, maxValue, detailed, selec
 
 
 
-fetch(`${window.location.origin}/get_antennas`)
+fetch(`http://127.0.0.1:5000/get_antennas`)
 .then(response => response.json())
 .then(data => {
     const selectContainer = document.getElementById('select-container');
@@ -219,8 +260,6 @@ fetch(`${window.location.origin}/get_antennas`)
     });
 });
 
-
-//Button - Fetch JSON Data and Update Chart
 document.getElementById("fetch-data").addEventListener("click", () => {
 
     const checkboxes = document.querySelectorAll('input[name="Antena"]');
@@ -256,7 +295,6 @@ document.getElementById("fetch-data").addEventListener("click", () => {
         return;
     }
 
-        // Function to convert date to string format, that does not change the time zone
         function fromDateToString(date){
             date = new Date(+date);
             date.setTime(date.getTime() - (date.getTimezoneOffset() * 60000));
@@ -267,7 +305,7 @@ document.getElementById("fetch-data").addEventListener("click", () => {
 
         const promises = selectedAntennas.map(antenna => {
             const name = antenna;
-            return fetch(`${window.location.origin}/get_real_data?antenna=${name}&start_time=${fromDateToString(startTime)}&stop_time=${fromDateToString(endTime)}&detailed=${detailed}`)
+            return fetch(`http://127.0.0.1:5000/get_real_data?antenna=${name}&start_time=${fromDateToString(startTime)}&stop_time=${fromDateToString(endTime)}&detailed=${detailed}`)
                 .then(response => response.json())
                 .then(result => {
 
@@ -329,14 +367,13 @@ document.getElementById("fetch-data").addEventListener("click", () => {
                     return [];
                 });
         });
+        
 
 
         Promise.all(promises)
         .then(results => {
             const aapl = results.flat();
-            console.log(aapl);
 
-            // Filtering the data by date
             filteredData = aapl.filter(d => d.date >= startTime && d.date <= endTime);
 
             if (filteredData.length === 0) {
@@ -344,6 +381,13 @@ document.getElementById("fetch-data").addEventListener("click", () => {
                 return;
             }
             drawChart(filteredData, startTime, endTime, minValue, maxValue, detailed, selectedAntennas);
+
+            if (detailed === 0) {
+                    document.getElementById('alert').textContent = `Używasz trybu uśredniającego`;
+            }
+            else {
+                document.getElementById('alert').textContent = ``;
+            }
 
             if (selectedAntennas.length === 1) {
                 if (detailed === 0) {
@@ -354,7 +398,6 @@ document.getElementById("fetch-data").addEventListener("click", () => {
                     document.getElementById('avg').textContent = `Średnia: ${avg.toFixed(2)} dBm`;
                     document.getElementById('max-label').textContent = `Maks: ${max.toFixed(2)} dBm`;
                     document.getElementById('min-label').textContent = `Min: ${min.toFixed(2)} dBm`;
-                    document.getElementById('alert').textContent = `Używasz trybu uśredniającego`;
                 } else {
                     const avg = d3.mean(filteredData, d => d.close);
                     const max = d3.max(filteredData, d => d.close);
@@ -409,7 +452,6 @@ document.getElementById("export-data").addEventListener("click", () => {
 
     const csvData = convertToCSV(filteredData);
 
-    // Creating blob object with csv data
     const blob = new Blob([csvData], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -417,10 +459,9 @@ document.getElementById("export-data").addEventListener("click", () => {
     link.download = "data.csv";
     link.click();
 
-    //Clearing the data
     URL.revokeObjectURL(url);
 });
-// Button to export the data as JSON
+
 document.getElementById("export-json").addEventListener("click", () => {
     if (!filteredData || filteredData.length === 0) {
         alert("Brak danych do eksportu.");
@@ -447,13 +488,11 @@ function addLegend(svg, antennas, colorScale) {
         const legendRow = legend.append("g")
             .attr("transform", `translate(0, ${i * 20})`);
 
-        // Add rectangle with color
         legendRow.append("rect")
             .attr("width", 12)
             .attr("height", 12)
             .attr("fill", colorScale(antenna));
 
-        // Add text next to the rectangle
         legendRow.append("text")
             .attr("x", 16)
             .attr("y", 10)
