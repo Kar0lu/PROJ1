@@ -228,7 +228,7 @@ function drawChart(aapl, startTime, endTime, minValue, maxValue, detailed, selec
 
 
 
-fetch(`https://proj.top/get_antennas`)
+fetch(`${window.location.origin}/get_antennas`)
 .then(response => response.json())
 .then(data => {
     const selectContainer = document.getElementById('select-container');
@@ -305,7 +305,7 @@ document.getElementById("fetch-data").addEventListener("click", () => {
 
         const promises = selectedAntennas.map(antenna => {
             const name = antenna;
-            return fetch(`https://proj.top/get_real_data?antenna=${name}&start_time=${fromDateToString(startTime)}&stop_time=${fromDateToString(endTime)}&detailed=${detailed}`)
+            return fetch(`${window.location.origin}/get_real_data?antenna=${name}&start_time=${fromDateToString(startTime)}&stop_time=${fromDateToString(endTime)}&detailed=${detailed}`)
                 .then(response => response.json())
                 .then(result => {
 

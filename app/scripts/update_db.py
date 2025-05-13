@@ -2,7 +2,7 @@ import os
 import numpy as np
 import datetime
 import sys
-from tqdm import tqdm
+
 
 # To import from parent directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
@@ -26,7 +26,7 @@ with app.app_context():
     buffer = []
     batch_size = 1000
 
-    for fetched_file in tqdm(all_fetched_files):
+    for fetched_file in all_fetched_files:
         # For better readability later on
         file_path = os.path.join(data_path, fetched_file)
         # Separating Anttenna name from date and time
