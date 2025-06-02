@@ -38,6 +38,10 @@ ENV PYTHONUNBUFFERED=1
 
 USER appuser
 
+# Fix for Windows
+RUN chmod +x /app/init_db.py && \
+    find /app -type f -name "init_db.py" -exec sed -i 's/\r$//' {} +
+
 WORKDIR /app
  
 # Expose port for server
