@@ -271,16 +271,35 @@ document.getElementById("fetch-data").addEventListener("click", () => {
         }
     });
 
-
     const startTime = new Date(document.getElementById('start').value);
     const endTime = new Date(document.getElementById('end').value);
+
+    // --- Clear cache if date range does not overlap ---
+    function isOverlap(aStart, aEnd, bStart, bEnd) {
+        return aStart <= bEnd && bStart <= aEnd;
+    }
+
+    const lastRange = JSON.parse(localStorage.getItem('lastDateRange'));
+    if (lastRange) {
+        const lastStart = new Date(lastRange.start);
+        const lastEnd = new Date(lastRange.end);
+        if (!isOverlap(startTime, endTime, lastStart, lastEnd)) {
+            // Remove only antennaData_* keys
+            Object.keys(localStorage).forEach(key => {
+                if (key.startsWith('antennaData_')) {
+                    localStorage.removeItem(key);
+                }
+            });
+        }
+    }
+    // Save current range
+    localStorage.setItem('lastDateRange', JSON.stringify({ start: startTime.toISOString(), end: endTime.toISOString() }));
 
     var Time = new Date(endTime.getTime() - startTime.getTime());
     var detailed = Time / 1000 / 60 / 60 / 24 >= 1.5 ? 0 : 1;
 
     const minValue = Number(document.getElementById('min').value);
     const maxValue = Number(document.getElementById('max').value);
-
 
     if (isNaN(startTime) || isNaN(endTime)) {
         alert('Podaj prawidłowy przedział czasowy.');
@@ -295,140 +314,166 @@ document.getElementById("fetch-data").addEventListener("click", () => {
         return;
     }
 
-        function fromDateToString(date){
-            date = new Date(+date);
-            date.setTime(date.getTime() - (date.getTimezoneOffset() * 60000));
-            let dateAsString =  date.toISOString().substr(0, 19);
-            return dateAsString;
+    function fromDateToString(date){
+        date = new Date(+date);
+        date.setTime(date.getTime() - (date.getTimezoneOffset() * 60000));
+        let dateAsString =  date.toISOString().substr(0, 19);
+        return dateAsString;
+    }
+
+    // --- LocalStorage cache helpers ---
+    function getCacheKey(antenna, start, end, detailed) {
+        return `antennaData_${antenna}_${start}_${end}_${detailed}`;
+    }
+    function saveToCache(key, data) {
+        try {
+            localStorage.setItem(key, JSON.stringify(data));
+        } catch (e) {
+            // If storage is full, ignore
+        }
+    }
+    function loadFromCache(key) {
+        const item = localStorage.getItem(key);
+        if (!item) return null;
+        try {
+            return JSON.parse(item);
+        } catch {
+            return null;
+        }
+    }
+    // ---
+
+    const promises = selectedAntennas.map(antenna => {
+        const name = antenna;
+        const startStr = fromDateToString(startTime);
+        const endStr = fromDateToString(endTime);
+        const cacheKey = getCacheKey(name, startStr, endStr, detailed);
+
+        // Try to load from cache
+        const cached = loadFromCache(cacheKey);
+        if (cached && Array.isArray(cached) && cached.length > 0) {
+            // Convert date strings back to Date objects
+            return Promise.resolve(cached.map(d => ({
+                ...d,
+                date: new Date(d.date)
+            })));
         }
 
+        // Not cached, fetch from server
+        return fetch(`${window.location.origin}/get_real_data?antenna=${name}&start_time=${startStr}&stop_time=${endStr}&detailed=${detailed}`)
+            .then(response => response.json())
+            .then(result => {
+                const intervalMs = 3125;
+                let antennaData = [];
 
-        const promises = selectedAntennas.map(antenna => {
-            const name = antenna;
-            return fetch(`${window.location.origin}/get_real_data?antenna=${name}&start_time=${fromDateToString(startTime)}&stop_time=${fromDateToString(endTime)}&detailed=${detailed}`)
-                .then(response => response.json())
-                .then(result => {
+                for (const [startDateStr, values] of Object.entries(result)) {
+                    const startDate = new Date(startDateStr);
 
-                    const intervalMs = 3125;
-                    let antennaData = [];
-
-                    for (const [startDateStr, values] of Object.entries(result)) {
-                        const startDate = new Date(startDateStr);
-
-                        if (detailed === 0) {
-                            const { avg, max, min } = values;
-                            antennaData.push({
-                                date: startDate,
-                                close: avg,
-                                max: max,
-                                min: min,
-                                antenna: antenna
-                            });
-                            if(selectedAntennas.length === 1) {
+                    if (detailed === 0) {
+                        const { avg, max, min } = values;
+                        antennaData.push({
+                            date: startDate,
+                            close: avg,
+                            max: max,
+                            min: min,
+                            antenna: antenna
+                        });
+                    } else {
+                        const { value } = values;
+                        if (!Array.isArray(value)) continue;
+                        const partialData = value.map((val, idx) => {
+                            if (val !== null && val !== undefined && !isNaN(val) && val <= 200 && val >= -200) {
+                                return {
+                                    date: new Date(startDate.getTime() + idx * intervalMs),
+                                    close: parseFloat(val),
+                                    antenna: antenna
+                                };
+                            } else {
+                                return null;
                             }
-
-                        } else {
-                            const { avg, max, min, value } = values;
-
-                            if (!Array.isArray(value)) {
-                                console.warn(`Oczekiwano tablicy wartości dla ${antenna}, otrzymano:`, value);
-                                continue;
-                            }
-
-                            const partialData = value.map((val, idx) => {
-                                if (val !== null && val !== undefined && !isNaN(val) && val <= 200 && val >= -200) {
-                                    return {
-                                        date: new Date(startDate.getTime() + idx * intervalMs),
-                                        close: parseFloat(val),
-                                        antenna: antenna
-                                    };
-                                } else {
-                                    return null;
-                                }
-                            }).filter(d => d !== null);
-
-                            antennaData = antennaData.concat(partialData);
-
-                        }
+                        }).filter(d => d !== null);
+                        antennaData = antennaData.concat(partialData);
                     }
+                }
 
-                
-                    if (antennaData.length === 0) {
-                        console.warn(`Brak prawidłowych danych w tablicy dla ${antenna}.`);
-                        alert(`Brak prawidłowych danych dla ${antenna}.`);
-                        return [];
-                    }
-                
-                    return antennaData
-                })
-                .catch(error => {
-                    console.error(`Error fetching data for ${antenna}:`, error);
-                    alert(`Wystąpił problem z pobieraniem danych dla ${antenna}.`);
+                if (antennaData.length === 0) {
+                    alert(`Brak prawidłowych danych dla ${antenna}.`);
                     return [];
-                });
-        });
-        
+                }
 
+                // Save to cache (dates as ISO strings)
+                saveToCache(cacheKey, antennaData.map(d => ({
+                    ...d,
+                    date: d.date.toISOString()
+                })));
 
-        Promise.all(promises)
-        .then(results => {
-            const aapl = results.flat();
+                return antennaData;
+            })
+            .catch(error => {
+                alert(`Wystąpił problem z pobieraniem danych dla ${antenna}.`);
+                return [];
+            });
+    });
 
-            filteredData = aapl.filter(d => d.date >= startTime && d.date <= endTime);
+    Promise.all(promises)
+    .then(results => {
+        const aapl = results.flat();
 
-            if (filteredData.length === 0) {
-                alert('Brak danych do wyświetlenia dla wybranego przedziału czasowego.');
-                return;
-            }
-            drawChart(filteredData, startTime, endTime, minValue, maxValue, detailed, selectedAntennas);
+        filteredData = aapl.filter(d => d.date >= startTime && d.date <= endTime);
 
+        if (filteredData.length === 0) {
+            alert('Brak danych do wyświetlenia dla wybranego przedziału czasowego.');
+            return;
+        }
+        drawChart(filteredData, startTime, endTime, minValue, maxValue, detailed, selectedAntennas);
+
+        if (detailed === 0) {
+            document.getElementById('alert').textContent = `Używasz trybu uśredniającego`;
+        }
+        else {
+            document.getElementById('alert').textContent = ``;
+        }
+
+        if (selectedAntennas.length === 1) {
             if (detailed === 0) {
-                    document.getElementById('alert').textContent = `Używasz trybu uśredniającego`;
-            }
-            else {
-                document.getElementById('alert').textContent = ``;
-            }
+                const avg = d3.mean(filteredData, d => d.close);
+                const max = d3.max(filteredData, d => d.max);
+                const min = d3.min(filteredData, d => d.min);
 
-            if (selectedAntennas.length === 1) {
-                if (detailed === 0) {
-                    const avg = d3.mean(filteredData, d => d.close);
-                    const max = d3.max(filteredData, d => d.max);
-                    const min = d3.min(filteredData, d => d.min);
-            
-                    document.getElementById('avg').textContent = `Średnia: ${avg.toFixed(2)} dBm`;
-                    document.getElementById('max-label').textContent = `Maks: ${max.toFixed(2)} dBm`;
-                    document.getElementById('min-label').textContent = `Min: ${min.toFixed(2)} dBm`;
-                } else {
-                    const avg = d3.mean(filteredData, d => d.close);
-                    const max = d3.max(filteredData, d => d.close);
-                    const min = d3.min(filteredData, d => d.close);
-            
-                    document.getElementById('avg').textContent = `Średnia: ${avg.toFixed(2)} dBm`;
-                    document.getElementById('max-label').textContent = `Maks: ${max.toFixed(2)} dBm`;
-                    document.getElementById('min-label').textContent = `Min: ${min.toFixed(2)} dBm`;
-                }
-            }
-            else{
-                document.getElementById('avg').textContent = `Średnia: -`;
-                document.getElementById('max-label').textContent = `Maks: -`;
-                document.getElementById('min-label').textContent = `Min: -`;
-            }
+                document.getElementById('avg').textContent = `Średnia: ${avg.toFixed(2)} dBm`;
+                document.getElementById('max-label').textContent = `Maks: ${max.toFixed(2)} dBm`;
+                document.getElementById('min-label').textContent = `Min: ${min.toFixed(2)} dBm`;
+            } else {
+                const avg = d3.mean(filteredData, d => d.close);
+                const max = d3.max(filteredData, d => d.close);
+                const min = d3.min(filteredData, d => d.close);
 
-            const container = document.getElementById('container');
-            const resizeObserver = new ResizeObserver(() => {
-                if (filteredData.length > 0) {
-                    const startTime = new Date(document.getElementById('start').value);
-                    const endTime = new Date(document.getElementById('end').value);
-                    const minValue = Number(document.getElementById('min').value);
-                    const maxValue = Number(document.getElementById('max').value);
-                    drawChart(filteredData, startTime, endTime, minValue, maxValue, detailed, selectedAntennas);
-                }
-});
-resizeObserver.observe(container);
-        })
-        .catch(error => {
-            console.error("Error fetching data:", error);
+                document.getElementById('avg').textContent = `Średnia: ${avg.toFixed(2)} dBm`;
+                document.getElementById('max-label').textContent = `Maks: ${max.toFixed(2)} dBm`;
+                document.getElementById('min-label').textContent = `Min: ${min.toFixed(2)} dBm`;
+            }
+        }
+        else{
+            document.getElementById('avg').textContent = `Średnia: -`;
+            document.getElementById('max-label').textContent = `Maks: -`;
+            document.getElementById('min-label').textContent = `Min: -`;
+        }
+
+        const container = document.getElementById('container');
+        const resizeObserver = new ResizeObserver(() => {
+            if (filteredData.length > 0) {
+                const startTime = new Date(document.getElementById('start').value);
+                const endTime = new Date(document.getElementById('end').value);
+                const minValue = Number(document.getElementById('min').value);
+                const maxValue = Number(document.getElementById('max').value);
+                drawChart(filteredData, startTime, endTime, minValue, maxValue, detailed, selectedAntennas);
+            }
         });
+        resizeObserver.observe(container);
+    })
+    .catch(error => {
+        console.error("Error fetching data:", error);
+    });
 });
 document.getElementById("export-data").addEventListener("click", () => {
     // Checking whether there is something to export
