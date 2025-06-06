@@ -23,14 +23,34 @@ document.addEventListener('DOMContentLoaded', function() {
             maxInput.disabled = false;
             maxInput.style.borderColor = "";
         }
+       
     }
     
+    avgValueInput.checked = true;
     autoCheckbox.checked = true;
     handleAutoChange();
     
     autoCheckbox.addEventListener("change", handleAutoChange);
 });
 
+const maxValueInput = document.getElementById("maxv");
+const avgValueInput = document.getElementById("avgv");
+var choosenValue = "avg";
+
+maxValueInput.addEventListener("change", () => {
+    if (maxValueInput.checked) {
+        avgValueInput.checked = false;
+        choosenValue = "max";
+
+    }
+});
+
+avgValueInput.addEventListener("change", () => {
+    if (avgValueInput.checked) {
+        maxValueInput.checked = false;
+        choosenValue = "avg";
+    }
+});
 
 document.addEventListener('DOMContentLoaded', function() {
     const now = new Date();
@@ -92,7 +112,14 @@ function drawChart(aapl, startTime, endTime, minValue, maxValue, detailed, selec
     }
 
     const y = d3.scaleLinear().domain([maxValue, minValue]).nice().range([margin.top, height - margin.bottom]);
-    const line = d3.line().x(d => x(d.date)).y(d => y(d.close));
+    var line = d3.line();
+    if(avgValueInput.checked) {
+        line = d3.line().x(d => x(d.date)).y(d => y(d.close));
+    }
+    else {
+        line = d3.line().x(d => x(d.date)).y(d => y(d.max));
+    }
+        
     const dataByAntenna = d3.group(aapl, d => d.antenna);
 
     d3.select("#container").select("svg").remove();
