@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3
+#!./.venv/bin/python3
 from server import app
 from models import db
 
