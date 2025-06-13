@@ -13,9 +13,8 @@ from models import Data, Antenna
 data_path = os.path.join(os.path.dirname(__file__), "..", "data", "raw")
 all_fetched_files = [
     f for f in os.listdir(data_path)
-    if f and not f.startswith('.')  # pomijamy puste i ukryte pliki
+    if f and not f.startswith('.')
 ]
-all_fetched_files.pop()
 
 with app.app_context():
     existing_antennas = {a.antenna_id for a in Antenna.query.all()}
@@ -34,6 +33,10 @@ with app.app_context():
 
         if len(splitted) < 3:
             print(f"Ommiting bad filename: {fetched_file}")
+            # Removing corrupted files and adding them to exclude.txt
+            with open("exclude.txt", "a") as exc:
+                exc.write(f"{fetched_file}\n")
+            os.unlink(file_path)
             continue
         name = splitted[0]
 
@@ -44,14 +47,27 @@ with app.app_context():
                                     int(hms[0]), int(hms[1]), int(hms[2]))
         except (IndexError, ValueError) as e:
             print(f"Date parsing error in file {fetched_file}: {e}")
+            # Removing corrupted files and adding them to exclude.txt
+            with open("exclude.txt", "a") as exc:
+                exc.write(f"{fetched_file}\n")
+            os.unlink(file_path)
             continue
 
         # Looking for existing data
         if (name, date) in existing_data_keys:
+            # Removing files if we already have them in db
+            with open("exclude.txt", "a") as exc:
+                exc.write(f"{fetched_file}\n")
+            os.unlink(file_path)
             continue
             
         # Reading file data if file is not corrupt
-        if os.path.getsize(file_path) != 768: continue
+        if os.path.getsize(file_path) != 768:
+            # Removing corrupted files and adding them to exclude.txt
+            with open("exclude.txt", "a") as exc:
+                exc.write(f"{fetched_file}\n")
+            os.unlink(file_path)
+            continue
         raw_data = np.fromfile(open(file_path), dtype = np.float32)
 
         mean = float(np.nanmean(raw_data))
@@ -74,6 +90,12 @@ with app.app_context():
                             mean_value = mean,
                             max_value=max,
                             min_value=min ))
+
+        # Delete raw data that are already in db and add them to exclusion file
+        with open("exclude.txt", "a") as exc:
+            exc.write(f"{fetched_file}\n")
+
+        os.unlink(file_path)
 
         # Commit in batches
         if len(buffer) >= batch_size:
